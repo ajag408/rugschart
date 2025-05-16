@@ -26,11 +26,18 @@ const CandleChart = () => {
     const [isGeneratingCandles, setIsGeneratingCandles] = useState<boolean>(false);
     const [currentCandleIndex, setCurrentCandleIndex] = useState<number>(0);
     const [candleData, setCandleData] = useState<any[]>([]);
+    const [rugPulled, setRugPulled] = useState(false);
+
     const completedCandlesRef = useRef<any[]>(new Array(30).fill(null));
     const animationFrameId = useRef<number | undefined>(undefined);
     const lastUpdateTime = useRef<number>(Date.now());
     const candleStartTime = useRef<number>(0);
     const currentIndexRef = useRef(0);
+    const yAxisMin = useRef<number>(0.5);
+    const yAxisMax = useRef<number>(1.5);
+    const MAX_DURATION_MS = 30 * 1000; // 30 seconds for testing
+    const rugPullTimeoutRef = useRef<number | null>(null);
+    const startTimeRef = useRef<number>(0);
 
     const animationState = useRef({
         startValue: 0,
@@ -74,9 +81,23 @@ const CandleChart = () => {
                 barPercentage: 0.8,
                 categoryPercentage: 0.8,
                 barThickness: 20,
-                // skipNull: true  // Add this line
             }]
         };
+    };
+
+    const executeRugPull = () => {
+        setRugPulled(true);
+        
+        // Force current candle to zero
+        const currentValue = animationState.current.currentValue;
+        animationState.current = {
+            ...animationState.current,
+            targetValue: 0,
+            startValue: currentValue
+        };
+        
+        // Reset candleStartTime to create a quick animation to zero
+        candleStartTime.current = Date.now();
     };
 
     const resetChart = () => {
@@ -88,21 +109,51 @@ const CandleChart = () => {
         setData(createChartData([]));
         setCountdown(3);
         setIsRunning(true);
+        setRugPulled(false);
         animationState.current = {
             startValue: 0,
             targetValue: 0,
             currentValue: 0,
             base: 1
         };
+        yAxisMin.current = 0.5;
+        yAxisMax.current = 1.5;
         lastUpdateTime.current = Date.now();
+
+        // Clear any existing rug pull timeout
+        if (rugPullTimeoutRef.current) {
+            clearTimeout(rugPullTimeoutRef.current);
+        }
+    };
+
+    const updateAxisBounds = (newValue: number) => {
+        if (newValue > yAxisMax.current) {
+            yAxisMax.current = Math.ceil(newValue * 2) / 2;
+        }
+        if (newValue < yAxisMin.current) {
+            yAxisMin.current = Math.floor(newValue * 2) / 2;
+        }
     };
 
     const startNewCandle = () => {
+        const currentTime = Date.now();
+        if (currentTime - startTimeRef.current >= MAX_DURATION_MS) {
+            setIsGeneratingCandles(false);
+            setTimeout(resetChart, 1000);
+            return;
+        }
+
         const prevValue = currentIndexRef.current === 0 
             ? 1  // Only the first candle starts at 1
-            : animationState.current.targetValue; // Use the previous candle's target as new base
+            : animationState.current.targetValue;
+
+        const maxChange = 5;
+        const absoluteMax = 100;
+        const minPossibleTarget = Math.max(prevValue - maxChange, 0);
+        const maxPossibleTarget = Math.min(prevValue + maxChange, absoluteMax);
         
-        const targetValue = Math.random() * 5;
+        const targetValue = minPossibleTarget + (Math.random() * (maxPossibleTarget - minPossibleTarget));
+        
         console.log(`Starting new candle at position ${currentIndexRef.current} with base ${prevValue} and target ${targetValue}`);
         
         animationState.current = {
@@ -119,25 +170,31 @@ const CandleChart = () => {
 
         const currentTime = Date.now();
         const elapsedTime = currentTime - candleStartTime.current;
-        const duration = 5000;
+        const duration = rugPulled ? 1000 : 3000; // Faster animation during rug pull
 
         if (elapsedTime >= duration) {
+            if (rugPulled) {
+                setIsGeneratingCandles(false);
+                setTimeout(resetChart, 1000);
+                return;
+            }
+
             const currentIndex = currentIndexRef.current;
+            const finalValue = animationState.current.targetValue;
+            
+            updateAxisBounds(finalValue);
             
             completedCandlesRef.current[currentIndex] = {
-                value: animationState.current.targetValue,
+                value: finalValue,
                 position: currentIndex,
                 base: animationState.current.base
             };
-            
-            console.log('Completed candles:', completedCandlesRef.current.filter(c => c !== null));
 
             setCandleData([]);
             setData(createChartData([]));
 
             if (currentIndex < 29) {
                 const nextIndex = currentIndex + 1;
-                console.log(`Moving to next candle position: ${nextIndex}`);
                 currentIndexRef.current = nextIndex;
                 setCurrentCandleIndex(nextIndex);
                 startNewCandle();
@@ -150,8 +207,10 @@ const CandleChart = () => {
             const progress = elapsedTime / duration;
             const { startValue, targetValue, base } = animationState.current;
             
-            const noise = Math.sin(progress * Math.PI * 8) * 0.05;
+            const noise = rugPulled ? 0 : Math.sin(progress * Math.PI * 8) * 0.05;
             const currentValue = startValue + (targetValue - startValue) * progress + noise;
+            
+            updateAxisBounds(currentValue);
             
             animationState.current.currentValue = currentValue;
 
@@ -210,14 +269,30 @@ const CandleChart = () => {
 
     useEffect(() => {
         if (isGeneratingCandles) {
+            startTimeRef.current = Date.now();
             startNewCandle();
             animateCandle();
+
+            // Set up random rug pull timer
+            const rugPullDelay = Math.random() * MAX_DURATION_MS;
+            rugPullTimeoutRef.current = setTimeout(executeRugPull, rugPullDelay);
+
+            // Set up max duration timer
+            const maxDurationTimeout = setTimeout(() => {
+                setIsGeneratingCandles(false);
+                setTimeout(resetChart, 1000);
+            }, MAX_DURATION_MS);
+
+            return () => {
+                if (rugPullTimeoutRef.current) {
+                    clearTimeout(rugPullTimeoutRef.current);
+                }
+                clearTimeout(maxDurationTimeout);
+                if (animationFrameId.current) {
+                    cancelAnimationFrame(animationFrameId.current);
+                }
+            };
         }
-        return () => {
-            if (animationFrameId.current) {
-                cancelAnimationFrame(animationFrameId.current);
-            }
-        };
     }, [isGeneratingCandles]);
 
     const options = {
@@ -229,14 +304,13 @@ const CandleChart = () => {
         scales: {
             y: {
                 position: 'left',
-                // beginAtZero: true,  // Add this line
                 ticks: {
                     callback: (value: number) => `${value.toFixed(1)}x`,
                     color: 'white',
                     font: { size: 14 }
                 },
-                min: 0,
-                max: 5,
+                min: yAxisMin.current,
+                max: yAxisMax.current,
                 grid: {
                     color: 'rgba(255, 255, 255, 0.1)'
                 }
@@ -285,6 +359,23 @@ const CandleChart = () => {
             }}>
                 {countdown.toFixed(1)}s
             </div>
+            {rugPulled && (
+                <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    padding: '20px',
+                    backgroundColor: 'rgba(255, 0, 0, 0.9)',
+                    color: 'white',
+                    borderRadius: '8px',
+                    fontSize: '24px',
+                    fontWeight: 'bold',
+                    textAlign: 'center'
+                }}>
+                    RUG PULLED!
+                </div>
+            )}
         </div>
     );
 };
