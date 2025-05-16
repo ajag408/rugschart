@@ -10,7 +10,6 @@ import {
 } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 
-// Register the required chart components
 ChartJS.register(
     CategoryScale,
     LinearScale,
@@ -21,161 +20,155 @@ ChartJS.register(
 );
 
 const CandleChart = () => {
-    // State for chart data and animation control
-    const [data, setData] = useState<any>(null);              // Chart data structure
-    const [countdown, setCountdown] = useState<number>(3);    // Initial countdown timer
-    const [isRunning, setIsRunning] = useState<boolean>(true);// Controls countdown state
-    const [isGeneratingCandles, setIsGeneratingCandles] = useState<boolean>(false); // Controls candle generation
-    const [currentCandleIndex, setCurrentCandleIndex] = useState<number>(0); // Current candle being animated
-    const [candleData, setCandleData] = useState<any[]>([]);  // Array of all candles
-
-    // Refs for animation tracking
+    const [data, setData] = useState<any>(null);
+    const [countdown, setCountdown] = useState<number>(3);
+    const [isRunning, setIsRunning] = useState<boolean>(true);
+    const [isGeneratingCandles, setIsGeneratingCandles] = useState<boolean>(false);
+    const [currentCandleIndex, setCurrentCandleIndex] = useState<number>(0);
+    const [candleData, setCandleData] = useState<any[]>([]);
+    const completedCandlesRef = useRef<any[]>(new Array(30).fill(null));
     const animationFrameId = useRef<number | undefined>(undefined);
     const lastUpdateTime = useRef<number>(Date.now());
     const candleStartTime = useRef<number>(0);
-    const candleTargetHeight = useRef<number>(0);
+    const currentIndexRef = useRef(0);
 
-    // Constants
-    const CANDLE_COUNT = 30;           // Total number of candles
-    const CANDLE_DURATION = 5000;      // Duration of each candle animation (5 seconds)
-    const BASE_PRICE = 1;              // Starting price (1x)
+    const animationState = useRef({
+        startValue: 0,
+        targetValue: 0,
+        currentValue: 0,
+        base: 1
+    });
 
-    /**
-     * Creates the data structure required by Chart.js
-     * @param candles - Array of candle data
-     * @param currentIndex - Index of currently animating candle
-     * @param currentHeight - Current height of animating candle
-     */
-    const createChartData = (candles: any[], currentIndex: number, currentHeight: number = 0) => {
+    const createChartData = (candles: any[]) => {
+        const visibleCandles = new Array(30).fill(null);
+        
+        // Place completed candles
+        completedCandlesRef.current.forEach((candle, index) => {
+            if (candle) {
+                visibleCandles[index] = candle;
+            }
+        });
+
+        // Place current animating candle
+        if (candles[currentIndexRef.current]) {
+            visibleCandles[currentIndexRef.current] = candles[currentIndexRef.current];
+        }
+
         return {
-            labels: Array.from({ length: CANDLE_COUNT }, (_, i) => i.toString()),
+            labels: Array.from({ length: 30 }, (_, i) => i.toString()),
             datasets: [{
-                data: candles.map((candle, index) => 
-                    index === currentIndex ? Math.abs(currentHeight) : (candle?.height || 0)
-                ),
-                backgroundColor: candles.map((candle, index) => 
-                    index === currentIndex 
-                        ? (currentHeight >= 0 ? 'rgba(0, 255, 0, 1)' : 'rgba(255, 0, 0, 1)')
-                        : (candle?.color || 'transparent')
-                ),
-                base: candles.map((candle, index) => BASE_PRICE),
+                data: visibleCandles.map((candle) => {
+                    if (!candle) return null;
+                    return [candle.base, candle.value];
+                }),
+                backgroundColor: visibleCandles.map((candle) => {
+                    if (!candle) return 'transparent';
+                    return candle.value >= candle.base ? 'rgba(0, 255, 0, 1)' : 'rgba(255, 0, 0, 1)';
+                }),
+                borderColor: visibleCandles.map((candle) => {
+                    if (!candle) return 'transparent';
+                    return candle.value >= candle.base ? 'rgba(0, 255, 0, 1)' : 'rgba(255, 0, 0, 1)';
+                }),
+                borderWidth: 1,
+                base: visibleCandles.map((candle) => candle?.base || null),
+                barPercentage: 0.8,
+                categoryPercentage: 0.8,
+                barThickness: 20,
+                // skipNull: true  // Add this line
             }]
         };
     };
 
-    /**
-     * Handles the animation of a single candle
-     */
+    const resetChart = () => {
+        setIsGeneratingCandles(false);
+        currentIndexRef.current = 0;
+        setCurrentCandleIndex(0);
+        completedCandlesRef.current = new Array(30).fill(null);
+        setCandleData([]);
+        setData(createChartData([]));
+        setCountdown(3);
+        setIsRunning(true);
+        animationState.current = {
+            startValue: 0,
+            targetValue: 0,
+            currentValue: 0,
+            base: 1
+        };
+        lastUpdateTime.current = Date.now();
+    };
+
+    const startNewCandle = () => {
+        const prevValue = currentIndexRef.current === 0 
+            ? 1  // Only the first candle starts at 1
+            : animationState.current.targetValue; // Use the previous candle's target as new base
+        
+        const targetValue = Math.random() * 5;
+        console.log(`Starting new candle at position ${currentIndexRef.current} with base ${prevValue} and target ${targetValue}`);
+        
+        animationState.current = {
+            startValue: prevValue,
+            targetValue: targetValue,
+            currentValue: prevValue,
+            base: prevValue
+        };
+        candleStartTime.current = Date.now();
+    };
+
     const animateCandle = () => {
         if (!isGeneratingCandles) return;
-        
+
         const currentTime = Date.now();
         const elapsedTime = currentTime - candleStartTime.current;
-        
-        // Check if current candle animation is complete
-        if (elapsedTime >= CANDLE_DURATION) {
-            handleCandleCompletion();
+        const duration = 5000;
+
+        if (elapsedTime >= duration) {
+            const currentIndex = currentIndexRef.current;
+            
+            completedCandlesRef.current[currentIndex] = {
+                value: animationState.current.targetValue,
+                position: currentIndex,
+                base: animationState.current.base
+            };
+            
+            console.log('Completed candles:', completedCandlesRef.current.filter(c => c !== null));
+
+            setCandleData([]);
+            setData(createChartData([]));
+
+            if (currentIndex < 29) {
+                const nextIndex = currentIndex + 1;
+                console.log(`Moving to next candle position: ${nextIndex}`);
+                currentIndexRef.current = nextIndex;
+                setCurrentCandleIndex(nextIndex);
+                startNewCandle();
+            } else {
+                console.log('Reached end of chart');
+                setIsGeneratingCandles(false);
+                setTimeout(resetChart, 1000);
+            }
         } else {
-            updateCurrentCandle(elapsedTime);
+            const progress = elapsedTime / duration;
+            const { startValue, targetValue, base } = animationState.current;
+            
+            const noise = Math.sin(progress * Math.PI * 8) * 0.05;
+            const currentValue = startValue + (targetValue - startValue) * progress + noise;
+            
+            animationState.current.currentValue = currentValue;
+
+            const newCandleData = [];
+            newCandleData[currentIndexRef.current] = {
+                value: currentValue,
+                position: currentIndexRef.current,
+                base: base
+            };
+            
+            setCandleData(newCandleData);
+            setData(createChartData(newCandleData));
         }
-        
+
         animationFrameId.current = requestAnimationFrame(animateCandle);
     };
 
-    /**
-     * Handles the completion of a candle animation
-     */
-    const handleCandleCompletion = () => {
-        const finalHeight = candleTargetHeight.current;
-        const newCandleData = [...candleData];
-        
-        // Save the completed candle
-        newCandleData[currentCandleIndex] = {
-            height: finalHeight,
-            base: BASE_PRICE,
-            color: finalHeight >= 0 ? 'rgba(0, 255, 0, 1)' : 'rgba(255, 0, 0, 1)'
-        };
-        
-        setCandleData(newCandleData);
-        
-        // Check if we should rug pull
-        if (currentCandleIndex >= CANDLE_COUNT - 1) {
-            handleRugPull(newCandleData);
-            return;
-        }
-        
-        // Start next candle
-        startNextCandle();
-    };
-
-    /**
-     * Updates the current animating candle
-     */
-    const updateCurrentCandle = (elapsedTime: number) => {
-        const progress = elapsedTime / CANDLE_DURATION;
-        const targetHeight = candleTargetHeight.current;
-        
-        // Add noise to make movement more realistic
-        const noise = Math.sin(progress * Math.PI * 8) * 0.05;
-        const currentHeight = targetHeight * progress + noise;
-        
-        const newCandleData = [...candleData];
-        newCandleData[currentCandleIndex] = {
-            height: currentHeight,
-            base: BASE_PRICE,
-            color: currentHeight >= 0 ? 'rgba(0, 255, 0, 1)' : 'rgba(255, 0, 0, 1)'
-        };
-        
-        setCandleData(newCandleData);
-        setData(createChartData(newCandleData, currentCandleIndex, currentHeight));
-    };
-
-    /**
-     * Handles the rug pull animation
-     */
-    const handleRugPull = (candleData: any[]) => {
-        const rugPullData = [...candleData];
-        rugPullData[CANDLE_COUNT - 1] = {
-            height: -BASE_PRICE,
-            base: BASE_PRICE,
-            color: 'rgba(255, 0, 0, 1)'
-        };
-        
-        setCandleData(rugPullData);
-        setIsGeneratingCandles(false);
-        setTimeout(resetChart, 2000);
-    };
-
-    /**
-     * Starts the next candle animation
-     */
-    const startNextCandle = () => {
-        setCurrentCandleIndex(prev => prev + 1);
-        candleStartTime.current = Date.now();
-        candleTargetHeight.current = (Math.random() - 0.5); // Random between -0.5 and 0.5
-    };
-
-    /**
-     * Resets the chart to initial state
-     */
-    const resetChart = () => {
-        const emptyCandles = Array(CANDLE_COUNT).fill(null).map(() => ({
-            height: 0,
-            base: BASE_PRICE,
-            color: 'transparent'
-        }));
-        
-        setIsGeneratingCandles(false);
-        setCurrentCandleIndex(0);
-        candleStartTime.current = 0;
-        candleTargetHeight.current = (Math.random() - 0.5);
-        setCandleData(emptyCandles);
-        setData(createChartData(emptyCandles, 0, 0));
-        setCountdown(3);
-        setIsRunning(true);
-    };
-
-    // Initialize chart
     useEffect(() => {
         resetChart();
         return () => {
@@ -185,7 +178,6 @@ const CandleChart = () => {
         };
     }, []);
 
-    // Handle countdown
     useEffect(() => {
         if (!isRunning) return;
 
@@ -194,7 +186,7 @@ const CandleChart = () => {
             const deltaTime = (currentTime - lastUpdateTime.current) / 1000;
             lastUpdateTime.current = currentTime;
 
-            setCountdown(prev => {
+            setCountdown((prev) => {
                 const newCountdown = prev - deltaTime;
                 if (newCountdown <= 0) {
                     setIsRunning(false);
@@ -204,24 +196,21 @@ const CandleChart = () => {
                 return newCountdown;
             });
 
-            animationFrameId.current = requestAnimationFrame(updateCountdown);
-        };
-
-        lastUpdateTime.current = Date.now();
-        animationFrameId.current = requestAnimationFrame(updateCountdown);
-
-        return () => {
-            if (animationFrameId.current) {
-                cancelAnimationFrame(animationFrameId.current);
+            if (countdown > 0) {
+                requestAnimationFrame(updateCountdown);
             }
         };
-    }, [isRunning]);
 
-    // Start candle generation
+        const animationId = requestAnimationFrame(updateCountdown);
+
+        return () => {
+            cancelAnimationFrame(animationId);
+        };
+    }, [isRunning, countdown]);
+
     useEffect(() => {
         if (isGeneratingCandles) {
-            candleStartTime.current = Date.now();
-            candleTargetHeight.current = (Math.random() - 0.5);
+            startNewCandle();
             animateCandle();
         }
         return () => {
@@ -231,7 +220,6 @@ const CandleChart = () => {
         };
     }, [isGeneratingCandles]);
 
-    // Chart configuration
     const options = {
         responsive: true,
         maintainAspectRatio: false,
@@ -241,24 +229,36 @@ const CandleChart = () => {
         scales: {
             y: {
                 position: 'left',
+                // beginAtZero: true,  // Add this line
                 ticks: {
                     callback: (value: number) => `${value.toFixed(1)}x`,
                     color: 'white',
                     font: { size: 14 }
                 },
                 min: 0,
-                max: 2, // Fixed scale 0-2x
+                max: 5,
                 grid: {
                     color: 'rgba(255, 255, 255, 0.1)'
                 }
             },
             x: {
-                display: false
+                display: false,
+                grid: {
+                    display: false
+                },
+                offset: true,
+                ticks: {
+                    display: false
+                }
             }
         },
         plugins: {
-            legend: { display: false },
-            tooltip: { enabled: false }
+            legend: {
+                display: false
+            },
+            tooltip: {
+                enabled: false
+            }
         }
     };
 
