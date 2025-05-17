@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
+import './CandleChart.css';
+
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -28,6 +30,7 @@ const CandleChart = () => {
     const [candleData, setCandleData] = useState<any[]>([]);
     const [rugPulled, setRugPulled] = useState(false);
     const [isShowingRugPullMessage, setIsShowingRugPullMessage] = useState(false);
+    const [shakingChart, setShakingChart] = useState(false);
 
     const completedCandlesRef = useRef<any[]>(new Array(30).fill(null));
     const animationFrameId = useRef<number | undefined>(undefined);
@@ -95,10 +98,13 @@ const CandleChart = () => {
             animationFrameId.current = undefined;
         }
         
+        setShakingChart(true);
+        setTimeout(() => setShakingChart(false), 1000);
         setIsRunning(false);
         setIsGeneratingCandles(false);
         setRugPulled(true);
         setIsShowingRugPullMessage(true);
+
         
         // Force current candle to instantly go to zero
         const currentValue = animationState.current.base;
@@ -109,6 +115,7 @@ const CandleChart = () => {
             currentValue: 0
         };
         
+        yAxisMin.current = 0;
         // Update the completed candles array with the rug pull candle
         completedCandlesRef.current[currentIndexRef.current] = {
             value: 0,
@@ -268,6 +275,22 @@ const CandleChart = () => {
         animationFrameId.current = requestAnimationFrame(animateCandle);
     };
 
+    // Add dynamic background based on chart performance
+    const getBackgroundGradient = () => {
+        const currentValue = animationState.current.currentValue;
+        const startValue = animationState.current.startValue;
+        
+        if (rugPulled) {
+            return 'linear-gradient(to bottom, #13141b, #3d0000)';
+        }
+        
+        if (currentValue > startValue) {
+            return 'linear-gradient(to bottom, #13141b, #003d00)';
+        }
+        
+        return 'linear-gradient(to bottom, #13141b, #13141b)';
+    };
+
     useEffect(() => {
         resetChart();
         return () => {
@@ -406,7 +429,10 @@ const CandleChart = () => {
             width: '100%',
             backgroundColor: '#13141b',
             borderRadius: '8px',
-            padding: '20px'
+            padding: '20px',
+            animation: shakingChart ? 'shake 0.5s infinite' : 'none',
+            background: getBackgroundGradient(),
+            transition: 'background 0.5s ease',
         }}>
             {data && <Bar data={data} options={options as any} />}
             <div style={{
@@ -418,26 +444,29 @@ const CandleChart = () => {
                 color: 'white',
                 borderRadius: '5px',
                 fontSize: '16px',
-                fontWeight: 'bold'
+                fontWeight: 'bold',
+                animation: countdownRef.current <= 5 && countdownRef.current > 0 ? 'pulse 0.5s infinite' : 'none'
             }}>
                 {countdown.toFixed(1)}s
             </div>
             {rugPulled && (
+            <>
                 <div style={{
                     position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    padding: '20px',
-                    backgroundColor: 'rgba(255, 0, 0, 0.9)',
-                    color: 'white',
-                    borderRadius: '8px',
-                    fontSize: '24px',
-                    fontWeight: 'bold',
-                    textAlign: 'center'
+                    top: '0',
+                    left: '0',
+                    right: '0',
+                    bottom: '0',
+                    backgroundColor: 'rgba(255, 0, 0, 0.2)',
+                    animation: 'fadeIn 0.3s ease-in'
+                }} />
+                <div style={{
+                    // ... existing rug pull message styles ...
+                    animation: 'dropIn 0.5s ease-out'
                 }}>
                     RUG PULLED!
                 </div>
+            </>
             )}
         </div>
     );
