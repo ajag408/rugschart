@@ -1,6 +1,8 @@
-import React, { useEffect, useState, useRef } from 'react';
+// Import necessary dependencies from React and Chart.js libraries
+import { useEffect, useState, useRef } from 'react';
 import './CandleChart.css';
 
+// Import required Chart.js components and plugins
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -13,6 +15,7 @@ import {
 import { Bar } from 'react-chartjs-2';
 import annotationPlugin from 'chartjs-plugin-annotation';
 
+// Register Chart.js components and plugins
 ChartJS.register(
     CategoryScale,
     LinearScale,
@@ -24,51 +27,72 @@ ChartJS.register(
 );
 
 const CandleChart = () => {
-    const [data, setData] = useState<any>(null);
-    const [countdown, setCountdown] = useState<number>(3);
-    const [isRunning, setIsRunning] = useState<boolean>(true);
-    const [isGeneratingCandles, setIsGeneratingCandles] = useState<boolean>(false);
-    const [currentCandleIndex, setCurrentCandleIndex] = useState<number>(0);
-    const [candleData, setCandleData] = useState<any[]>([]);
-    const [rugPulled, setRugPulled] = useState(false);
-    const [isShowingRugPullMessage, setIsShowingRugPullMessage] = useState(false);
-    const [shakingChart, setShakingChart] = useState(false);
+    // ==================== State Management ====================
+    
+    // Core chart states
+    const [data, setData] = useState<any>(null);                      // Holds formatted chart data for Chart.js
+    const [countdown, setCountdown] = useState<number>(3);            // Countdown timer before chart starts
+    const [isRunning, setIsRunning] = useState<boolean>(true);       // Controls countdown state
+    const [isGeneratingCandles, setIsGeneratingCandles] = useState<boolean>(false);  // Controls candle generation
+    const [currentCandleIndex, setCurrentCandleIndex] = useState<number>(0);         // Current candle position
+    const [candleData, setCandleData] = useState<any[]>([]);         // Current candle data
+    
+    // Rug pull related states
+    const [rugPulled, setRugPulled] = useState(false);               // Indicates if rug pull occurred
+    const [isShowingRugPullMessage, setIsShowingRugPullMessage] = useState(false);   // Controls rug pull message visibility
+    const [shakingChart, setShakingChart] = useState(false);         // Controls chart shake animation
 
-    const completedCandlesRef = useRef<any[]>(new Array(30).fill(null));
-    const animationFrameId = useRef<number | undefined>(undefined);
-    const lastUpdateTime = useRef<number>(Date.now());
-    const candleStartTime = useRef<number>(0);
-    const currentIndexRef = useRef(0);
-    const yAxisMin = useRef<number>(0.5);
-    const yAxisMax = useRef<number>(1.5);
-    const MAX_DURATION_MS = 30 * 1000; // 30 seconds for testing
-    const rugPullTimeoutRef = useRef<number | null>(null);
-    const startTimeRef = useRef<number>(0);
+    // ==================== Refs (Persistent Values) ====================
+    
+    // Chart data refs
+    const completedCandlesRef = useRef<any[]>(new Array(30).fill(null));  // Stores completed candles
+    const animationFrameId = useRef<number | undefined>(undefined);        // Stores animation frame ID
+    const lastUpdateTime = useRef<number>(Date.now());                     // Tracks last update timestamp
+    const candleStartTime = useRef<number>(0);                            // Start time of current candle
+    const currentIndexRef = useRef(0);                                    // Current candle index
+    
+    // Chart scaling refs
+    const yAxisMin = useRef<number>(0.5);                                 // Y-axis minimum value
+    const yAxisMax = useRef<number>(1.5);                                 // Y-axis maximum value
+    
+    // Timing and control refs
+    const MAX_DURATION_MS = 30 * 1000;                                    // Maximum chart duration (30 seconds)
+    const rugPullTimeoutRef = useRef<number | null>(null);               // Stores rug pull timeout
+    const startTimeRef = useRef<number>(0);                              // Chart start time
+    const countdownRef = useRef<number>(3);                              // Countdown value reference
 
-    const countdownRef = useRef<number>(3);
-
+    // Animation state management
     const animationState = useRef({
-        startValue: 0,
-        targetValue: 0,
-        currentValue: 0,
-        base: 1
+        startValue: 0,        // Starting value of current candle
+        targetValue: 0,       // Target value for current candle
+        currentValue: 0,      // Current animated value
+        base: 1              // Base value for current candle
     });
 
+    // ==================== Chart Data Creation ====================
+    
+    /**
+     * Creates formatted chart data for Chart.js consumption
+     * @param candles - Array of candle data
+     * @returns Formatted chart data object
+     */
     const createChartData = (candles: any[]) => {
+        // Initialize array for visible candles
         const visibleCandles = new Array(30).fill(null);
         
-        // Place completed candles
+        // Place all completed candles
         completedCandlesRef.current.forEach((candle, index) => {
             if (candle) {
                 visibleCandles[index] = candle;
             }
         });
 
-        // Place current animating candle
+        // Add current animating candle
         if (candles[currentIndexRef.current]) {
             visibleCandles[currentIndexRef.current] = candles[currentIndexRef.current];
         }
 
+        // Return formatted data structure for Chart.js
         return {
             labels: Array.from({ length: 30 }, (_, i) => i.toString()),
             datasets: [{
@@ -93,22 +117,29 @@ const CandleChart = () => {
         };
     };
 
+    // ==================== Rug Pull Logic ====================
+    
+    /**
+     * Executes the rug pull animation and state updates
+     */
     const executeRugPull = () => {
-        // Stop all ongoing animations and timers
+        // Clear ongoing animations
         if (animationFrameId.current) {
             cancelAnimationFrame(animationFrameId.current);
             animationFrameId.current = undefined;
         }
         
+        // Trigger visual effects
         setShakingChart(true);
         setTimeout(() => setShakingChart(false), 1000);
+        
+        // Update chart states
         setIsRunning(false);
         setIsGeneratingCandles(false);
         setRugPulled(true);
         setIsShowingRugPullMessage(true);
 
-        
-        // Force current candle to instantly go to zero
+        // Force current candle to zero
         const currentValue = animationState.current.base;
         animationState.current = {
             ...animationState.current,
@@ -117,23 +148,28 @@ const CandleChart = () => {
             currentValue: 0
         };
         
+        // Update chart bounds and data
         yAxisMin.current = 0;
-        // Update the completed candles array with the rug pull candle
         completedCandlesRef.current[currentIndexRef.current] = {
             value: 0,
             position: currentIndexRef.current,
             base: currentValue
         };
         
-        // Update the chart immediately
+        // Update chart display
         setCandleData([]);
         setData(createChartData([]));
     };
 
+    // ==================== Chart Reset Logic ====================
+    
+    /**
+     * Resets the chart to initial state
+     */
     const resetChart = () => {
         console.log("Resetting chart - Initial countdown value:", countdown);
         
-        // Clear any existing timeouts first
+        // Clear existing timeouts and animations
         if (rugPullTimeoutRef.current) {
             clearTimeout(rugPullTimeoutRef.current);
             rugPullTimeoutRef.current = null;
@@ -143,13 +179,14 @@ const CandleChart = () => {
             animationFrameId.current = undefined;
         }
 
-        // Reset all refs
+        // Reset all refs to initial values
         currentIndexRef.current = 0;
         startTimeRef.current = 0;
         candleStartTime.current = 0;
         lastUpdateTime.current = Date.now();
         completedCandlesRef.current = new Array(30).fill(null);
         
+        // Reset animation state
         animationState.current = {
             startValue: 0,
             targetValue: 0,
@@ -157,10 +194,11 @@ const CandleChart = () => {
             base: 1
         };
         
+        // Reset axis bounds
         yAxisMin.current = 0.5;
         yAxisMax.current = 1.5;
 
-        // Reset countdown ref first
+        // Reset countdown
         countdownRef.current = 3;
         
         // Reset all states
@@ -172,15 +210,18 @@ const CandleChart = () => {
         setCurrentCandleIndex(0);
         setCountdown(3);
         
-        console.log("After setting countdown to 3 in resetChart");
-        
-        // Start the countdown after a brief delay
+        // Start new round
         setTimeout(() => {
             console.log("Starting new round with countdown:", countdownRef.current);
             setIsRunning(true);
         }, 100);
     };
 
+    // ==================== Chart Animation Logic ====================
+    
+    /**
+     * Updates the chart's y-axis bounds based on new values
+     */
     const updateAxisBounds = (newValue: number) => {
         if (newValue > yAxisMax.current) {
             yAxisMax.current = Math.ceil(newValue * 2) / 2;
@@ -190,27 +231,29 @@ const CandleChart = () => {
         }
     };
 
+    /**
+     * Initializes a new candle with random target value
+     */
     const startNewCandle = () => {
         const currentTime = Date.now();
+        // Check if maximum duration reached
         if (currentTime - startTimeRef.current >= MAX_DURATION_MS) {
             setIsGeneratingCandles(false);
             setTimeout(resetChart, 1000);
             return;
         }
 
-        const prevValue = currentIndexRef.current === 0 
-            ? 1  // Only the first candle starts at 1
-            : animationState.current.targetValue;
-
+        // Calculate new candle parameters
+        const prevValue = currentIndexRef.current === 0 ? 1 : animationState.current.targetValue;
         const maxChange = 5;
         const absoluteMax = 100;
         const minPossibleTarget = Math.max(prevValue - maxChange, 0);
         const maxPossibleTarget = Math.min(prevValue + maxChange, absoluteMax);
         
+        // Generate random target value within bounds
         const targetValue = minPossibleTarget + (Math.random() * (maxPossibleTarget - minPossibleTarget));
         
-        console.log(`Starting new candle at position ${currentIndexRef.current} with base ${prevValue} and target ${targetValue}`);
-        
+        // Update animation state
         animationState.current = {
             startValue: prevValue,
             targetValue: targetValue,
@@ -220,6 +263,9 @@ const CandleChart = () => {
         candleStartTime.current = Date.now();
     };
 
+    /**
+     * Handles the candle animation frame updates
+     */
     const animateCandle = () => {
         if (!isGeneratingCandles || rugPulled) return;
 
@@ -228,20 +274,24 @@ const CandleChart = () => {
         const duration = 3000;
 
         if (elapsedTime >= duration) {
+            // Handle completed candle
             const currentIndex = currentIndexRef.current;
             const finalValue = animationState.current.targetValue;
             
             updateAxisBounds(finalValue);
             
+            // Store completed candle
             completedCandlesRef.current[currentIndex] = {
                 value: finalValue,
                 position: currentIndex,
                 base: animationState.current.base
             };
 
+            // Update chart
             setCandleData([]);
             setData(createChartData([]));
 
+            // Start next candle or reset chart
             if (currentIndex < 29) {
                 const nextIndex = currentIndex + 1;
                 currentIndexRef.current = nextIndex;
@@ -253,16 +303,18 @@ const CandleChart = () => {
                 setTimeout(resetChart, 1000);
             }
         } else {
+            // Animate current candle
             const progress = elapsedTime / duration;
             const { startValue, targetValue, base } = animationState.current;
             
+            // Add noise to animation unless rug pulled
             const noise = rugPulled ? 0 : Math.sin(progress * Math.PI * 8) * 0.05;
             const currentValue = startValue + (targetValue - startValue) * progress + noise;
             
             updateAxisBounds(currentValue);
-            
             animationState.current.currentValue = currentValue;
 
+            // Update current candle data
             const newCandleData = [];
             newCandleData[currentIndexRef.current] = {
                 value: currentValue,
@@ -270,14 +322,20 @@ const CandleChart = () => {
                 base: base
             };
             
+            // Update chart
             setCandleData(newCandleData);
             setData(createChartData(newCandleData));
         }
 
+        // Request next animation frame
         animationFrameId.current = requestAnimationFrame(animateCandle);
     };
 
-    // Add dynamic background based on chart performance
+    // ==================== Visual Effects ====================
+    
+    /**
+     * Generates background gradient based on chart performance
+     */
     const getBackgroundGradient = () => {
         const currentValue = animationState.current.currentValue;
         const startValue = animationState.current.startValue;
@@ -293,6 +351,9 @@ const CandleChart = () => {
         return 'linear-gradient(to bottom, #13141b, #13141b)';
     };
 
+    // ==================== Effect Hooks ====================
+    
+    // Initialize chart on mount
     useEffect(() => {
         resetChart();
         return () => {
@@ -302,6 +363,7 @@ const CandleChart = () => {
         };
     }, []);
 
+    // Handle countdown animation
     useEffect(() => {
         if (!isRunning) return;
         
@@ -315,7 +377,6 @@ const CandleChart = () => {
 
             setCountdown((prev) => {
                 const newCountdown = prev - deltaTime;
-                // Update the ref as well
                 countdownRef.current = newCountdown;
                 if (newCountdown <= 0) {
                     requestAnimationFrame(() => {
@@ -341,23 +402,25 @@ const CandleChart = () => {
         };
     }, [isRunning]);
 
+    // Start candle generation after countdown
     useEffect(() => {
         if (countdown === 0 && !isGeneratingCandles && !rugPulled) {
             setIsGeneratingCandles(true);
         }
     }, [countdown, rugPulled]);
 
+    // Handle candle generation and rug pull timing
     useEffect(() => {
         if (isGeneratingCandles) {
             startTimeRef.current = Date.now();
             startNewCandle();
             animateCandle();
 
-            // Set up random rug pull timer
+            // Set random rug pull timing
             const rugPullDelay = Math.random() * MAX_DURATION_MS;
             rugPullTimeoutRef.current = setTimeout(executeRugPull, rugPullDelay);
 
-            // Set up max duration timer
+            // Set maximum duration timeout
             const maxDurationTimeout = setTimeout(() => {
                 setIsGeneratingCandles(false);
                 setTimeout(resetChart, 1000);
@@ -371,6 +434,7 @@ const CandleChart = () => {
         }
     }, [isGeneratingCandles]);
 
+    // Handle rug pull message timing
     useEffect(() => {
         if (isShowingRugPullMessage) {
             const timer = setTimeout(() => {
@@ -383,6 +447,9 @@ const CandleChart = () => {
         }
     }, [isShowingRugPullMessage]);
 
+    // ==================== Chart Configuration ====================
+    
+    // Chart.js options configuration
     const options = {
         responsive: true,
         maintainAspectRatio: false,
@@ -394,7 +461,7 @@ const CandleChart = () => {
                 position: 'left',
                 ticks: {
                     callback: (value: number) => `${value.toFixed(1)}x`,
-                    color: '#e6e6e6', // Off-white
+                    color: '#e6e6e6',
                     font: {
                         size: 11,
                         family: "'Orbitron', sans-serif",
@@ -404,9 +471,9 @@ const CandleChart = () => {
                 min: yAxisMin.current,
                 max: yAxisMax.current,
                 grid: {
-                    color: 'rgba(230, 230, 230, 0.1)', // Very subtle off-white for grid lines
+                    color: 'rgba(230, 230, 230, 0.1)',
                     lineWidth: 1,
-                    borderDash: [5, 5] // Creates a dashed line effect
+                    borderDash: [5, 5]
                 }
             },
             x: {
@@ -459,10 +526,10 @@ const CandleChart = () => {
                     }
                 }
             }
-            
         }
     };
 
+    // ==================== Render ====================
     return (
         <div style={{ 
             position: 'relative', 
@@ -475,12 +542,15 @@ const CandleChart = () => {
             background: getBackgroundGradient(),
             transition: 'background 0.5s ease',
         }}>
+            {/* Render Chart */}
             {data && <Bar data={data} options={options as any} />}
+            
+            {/* Render Countdown */}
             {countdownRef.current > 0 && (
                 <div style={{
                     position: 'absolute',
                     top: '35%',
-                    left: '45%',
+                    left: '40%',
                     transform: 'translate(-50%, -50%)',
                     marginTop: '-20px',
                     marginLeft: '-20px',
@@ -491,27 +561,29 @@ const CandleChart = () => {
                     textAlign: 'center',
                     animation: countdownRef.current <= 3 ? 'pulse 0.5s infinite' : 'none',
                     zIndex: 10,
-                    fontFamily: "'Orbitron', sans-serif",  // Add this line
-                    textShadow: '0 0 10px rgba(255, 255, 255, 0.5)'  // Optional: adds a subtle glow
+                    fontFamily: "'Orbitron', sans-serif", 
+                    textShadow: '0 0 10px rgba(255, 255, 255, 0.5)'
                 }}>
                     <div style={{ 
                         fontSize: '20px', 
                         marginBottom: '10px',
-                        whiteSpace: 'nowrap',  // Add this to prevent text wrapping
-                        letterSpacing: '1px'  // Add this for a more tech feel
+                        whiteSpace: 'nowrap',  
+                        letterSpacing: '1px' 
                     }}>
                         Next Round In:
                     </div>
                     <div style={{ 
                         fontSize: '48px', 
                         fontWeight: 'bold',
-                        lineHeight: 1,  // Add this to improve vertical centering
-                        letterSpacing: '2px'  // Add this for a more tech feel
+                        lineHeight: 1,  
+                        letterSpacing: '2px'  
                     }}>
                         {countdownRef.current.toFixed(1)}s
                     </div>
                 </div>
             )}
+            
+            {/* Render Rug Pull Overlay */}
             {rugPulled && (
                 <>
                 <div style={{
@@ -540,7 +612,7 @@ const CandleChart = () => {
                 }}>
                     RUG PULLED!
                 </div>
-            </>
+                </>
             )}
         </div>
     );
