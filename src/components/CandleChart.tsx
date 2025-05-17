@@ -27,6 +27,7 @@ const CandleChart = () => {
     const [currentCandleIndex, setCurrentCandleIndex] = useState<number>(0);
     const [candleData, setCandleData] = useState<any[]>([]);
     const [rugPulled, setRugPulled] = useState(false);
+    const [isShowingRugPullMessage, setIsShowingRugPullMessage] = useState(false);
 
     const completedCandlesRef = useRef<any[]>(new Array(30).fill(null));
     const animationFrameId = useRef<number | undefined>(undefined);
@@ -38,6 +39,8 @@ const CandleChart = () => {
     const MAX_DURATION_MS = 30 * 1000; // 30 seconds for testing
     const rugPullTimeoutRef = useRef<number | null>(null);
     const startTimeRef = useRef<number>(0);
+
+    const countdownRef = useRef<number>(3);
 
     const animationState = useRef({
         startValue: 0,
@@ -86,7 +89,16 @@ const CandleChart = () => {
     };
 
     const executeRugPull = () => {
+        // Stop all ongoing animations and timers
+        if (animationFrameId.current) {
+            cancelAnimationFrame(animationFrameId.current);
+            animationFrameId.current = undefined;
+        }
+        
+        setIsRunning(false);
+        setIsGeneratingCandles(false);
         setRugPulled(true);
+        setIsShowingRugPullMessage(true);
         
         // Force current candle to instantly go to zero
         const currentValue = animationState.current.base;
@@ -94,7 +106,7 @@ const CandleChart = () => {
             ...animationState.current,
             targetValue: 0,
             startValue: currentValue,
-            currentValue: 0 // Set current value to 0 immediately
+            currentValue: 0
         };
         
         // Update the completed candles array with the rug pull candle
@@ -107,13 +119,11 @@ const CandleChart = () => {
         // Update the chart immediately
         setCandleData([]);
         setData(createChartData([]));
-        
-        // End the chart generation
-        setIsGeneratingCandles(false);
-        setTimeout(resetChart, 3000);
     };
 
     const resetChart = () => {
+        console.log("Resetting chart - Initial countdown value:", countdown);
+        
         // Clear any existing timeouts first
         if (rugPullTimeoutRef.current) {
             clearTimeout(rugPullTimeoutRef.current);
@@ -124,7 +134,7 @@ const CandleChart = () => {
             animationFrameId.current = undefined;
         }
 
-        // Reset all refs and states
+        // Reset all refs
         currentIndexRef.current = 0;
         startTimeRef.current = 0;
         candleStartTime.current = 0;
@@ -141,14 +151,25 @@ const CandleChart = () => {
         yAxisMin.current = 0.5;
         yAxisMax.current = 1.5;
 
-        // Reset all state variables
-        setCurrentCandleIndex(0);
+        // Reset countdown ref first
+        countdownRef.current = 3;
+        
+        // Reset all states
+        setIsShowingRugPullMessage(false);
+        setIsGeneratingCandles(false);
+        setRugPulled(false);
         setCandleData([]);
         setData(createChartData([]));
-        setRugPulled(false);
-        setIsGeneratingCandles(false);
+        setCurrentCandleIndex(0);
         setCountdown(3);
-        setIsRunning(true);  // This will trigger the countdown and start the new chart
+        
+        console.log("After setting countdown to 3 in resetChart");
+        
+        // Start the countdown after a brief delay
+        setTimeout(() => {
+            console.log("Starting new round with countdown:", countdownRef.current);
+            setIsRunning(true);
+        }, 100);
     };
 
     const updateAxisBounds = (newValue: number) => {
@@ -191,7 +212,7 @@ const CandleChart = () => {
     };
 
     const animateCandle = () => {
-        if (!isGeneratingCandles || rugPulled) return; // Stop animation if rug pulled
+        if (!isGeneratingCandles || rugPulled) return;
 
         const currentTime = Date.now();
         const elapsedTime = currentTime - candleStartTime.current;
@@ -258,6 +279,9 @@ const CandleChart = () => {
 
     useEffect(() => {
         if (!isRunning) return;
+        
+        console.log("Countdown started with value:", countdownRef.current);
+        lastUpdateTime.current = Date.now();
 
         const updateCountdown = () => {
             const currentTime = Date.now();
@@ -266,12 +290,13 @@ const CandleChart = () => {
 
             setCountdown((prev) => {
                 const newCountdown = prev - deltaTime;
+                // Update the ref as well
+                countdownRef.current = newCountdown;
                 if (newCountdown <= 0) {
-                    // Schedule these state changes for the next frame to avoid race conditions
                     requestAnimationFrame(() => {
                         setIsRunning(false);
                         setCountdown(0);
-                        // Explicitly start generating candles after countdown
+                        countdownRef.current = 0;
                         setIsGeneratingCandles(true);
                     });
                     return 0;
@@ -279,21 +304,18 @@ const CandleChart = () => {
                 return newCountdown;
             });
 
-            if (countdown > 0) {
+            if (countdownRef.current > 0) {
                 requestAnimationFrame(updateCountdown);
             }
         };
 
-        // Start the countdown animation
         const animationId = requestAnimationFrame(updateCountdown);
 
-        // Cleanup
         return () => {
             cancelAnimationFrame(animationId);
         };
     }, [isRunning]);
 
-    // Add a separate effect to handle countdown completion
     useEffect(() => {
         if (countdown === 0 && !isGeneratingCandles && !rugPulled) {
             setIsGeneratingCandles(true);
@@ -317,16 +339,24 @@ const CandleChart = () => {
             }, MAX_DURATION_MS);
 
             return () => {
-                if (rugPullTimeoutRef.current) {
-                    clearTimeout(rugPullTimeoutRef.current);
-                }
+                if (rugPullTimeoutRef.current) clearTimeout(rugPullTimeoutRef.current);
                 clearTimeout(maxDurationTimeout);
-                if (animationFrameId.current) {
-                    cancelAnimationFrame(animationFrameId.current);
-                }
+                if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
             };
         }
     }, [isGeneratingCandles]);
+
+    useEffect(() => {
+        if (isShowingRugPullMessage) {
+            const timer = setTimeout(() => {
+                setIsShowingRugPullMessage(false);
+                lastUpdateTime.current = Date.now();
+                resetChart();
+            }, 3000);
+            
+            return () => clearTimeout(timer);
+        }
+    }, [isShowingRugPullMessage]);
 
     const options = {
         responsive: true,
