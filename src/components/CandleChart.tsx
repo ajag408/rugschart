@@ -11,6 +11,7 @@ import {
     Legend
 } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
+import annotationPlugin from 'chartjs-plugin-annotation';
 
 ChartJS.register(
     CategoryScale,
@@ -18,7 +19,8 @@ ChartJS.register(
     BarElement,
     Title,
     Tooltip,
-    Legend
+    Legend,
+    annotationPlugin
 );
 
 const CandleChart = () => {
@@ -392,13 +394,19 @@ const CandleChart = () => {
                 position: 'left',
                 ticks: {
                     callback: (value: number) => `${value.toFixed(1)}x`,
-                    color: 'white',
-                    font: { size: 14 }
+                    color: '#e6e6e6', // Off-white
+                    font: {
+                        size: 11,
+                        family: "'Orbitron', sans-serif",
+                        weight: 'bold'
+                    },
                 },
                 min: yAxisMin.current,
                 max: yAxisMax.current,
                 grid: {
-                    color: 'rgba(255, 255, 255, 0.1)'
+                    color: 'rgba(230, 230, 230, 0.1)', // Very subtle off-white for grid lines
+                    lineWidth: 1,
+                    borderDash: [5, 5] // Creates a dashed line effect
                 }
             },
             x: {
@@ -418,7 +426,40 @@ const CandleChart = () => {
             },
             tooltip: {
                 enabled: false
+            },
+            annotation: {
+                annotations: {
+                    line1: {
+                        type: 'line',
+                        yMin: animationState.current.currentValue,
+                        yMax: animationState.current.currentValue,
+                        borderColor: '#e6e6e6',
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        label: {
+                            display: true,
+                            content: `${animationState.current.currentValue.toFixed(4)}x`,
+                            position: 'end',
+                            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                            color: '#ffffff',
+                            font: {
+                                family: "'Orbitron', sans-serif",
+                                size: 14,
+                                weight: 'bold'
+                            },
+                            padding: {
+                                top: 6,
+                                bottom: 6,
+                                left: 10,
+                                right: 10
+                            },
+                            borderRadius: 4,
+                            textAlign: 'center'
+                        }
+                    }
+                }
             }
+            
         }
     };
 
@@ -435,22 +476,44 @@ const CandleChart = () => {
             transition: 'background 0.5s ease',
         }}>
             {data && <Bar data={data} options={options as any} />}
-            <div style={{
-                position: 'absolute',
-                top: '10px',
-                right: '10px',
-                padding: '5px 10px',
-                backgroundColor: 'rgba(0,0,0,0.7)',
-                color: 'white',
-                borderRadius: '5px',
-                fontSize: '16px',
-                fontWeight: 'bold',
-                animation: countdownRef.current <= 5 && countdownRef.current > 0 ? 'pulse 0.5s infinite' : 'none'
-            }}>
-                {countdown.toFixed(1)}s
-            </div>
+            {countdownRef.current > 0 && (
+                <div style={{
+                    position: 'absolute',
+                    top: '35%',
+                    left: '45%',
+                    transform: 'translate(-50%, -50%)',
+                    marginTop: '-20px',
+                    marginLeft: '-20px',
+                    padding: '20px',
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    color: 'white',
+                    borderRadius: '8px',
+                    textAlign: 'center',
+                    animation: countdownRef.current <= 3 ? 'pulse 0.5s infinite' : 'none',
+                    zIndex: 10,
+                    fontFamily: "'Orbitron', sans-serif",  // Add this line
+                    textShadow: '0 0 10px rgba(255, 255, 255, 0.5)'  // Optional: adds a subtle glow
+                }}>
+                    <div style={{ 
+                        fontSize: '20px', 
+                        marginBottom: '10px',
+                        whiteSpace: 'nowrap',  // Add this to prevent text wrapping
+                        letterSpacing: '1px'  // Add this for a more tech feel
+                    }}>
+                        Next Round In:
+                    </div>
+                    <div style={{ 
+                        fontSize: '48px', 
+                        fontWeight: 'bold',
+                        lineHeight: 1,  // Add this to improve vertical centering
+                        letterSpacing: '2px'  // Add this for a more tech feel
+                    }}>
+                        {countdownRef.current.toFixed(1)}s
+                    </div>
+                </div>
+            )}
             {rugPulled && (
-            <>
+                <>
                 <div style={{
                     position: 'absolute',
                     top: '0',
@@ -461,8 +524,19 @@ const CandleChart = () => {
                     animation: 'fadeIn 0.3s ease-in'
                 }} />
                 <div style={{
-                    // ... existing rug pull message styles ...
-                    animation: 'dropIn 0.5s ease-out'
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    color: '#ff0000',
+                    fontSize: '64px',
+                    fontWeight: 'bold',
+                    fontFamily: "'Orbitron', sans-serif",
+                    textShadow: '0 0 20px rgba(255, 0, 0, 0.7)',
+                    animation: 'dropIn 0.5s ease-out',
+                    zIndex: 100,
+                    textAlign: 'center',
+                    letterSpacing: '4px'
                 }}>
                     RUG PULLED!
                 </div>
