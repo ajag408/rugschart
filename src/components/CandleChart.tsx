@@ -26,6 +26,14 @@ ChartJS.register(
     annotationPlugin
 );
 
+export const SOLANA_COLORS = {
+    primary: '#14F195',    // Solana's signature green
+    secondary: '#9945FF',  // Solana's purple
+    dark: '#13141b',      // Dark background
+    text: '#E6E6E6',      // Light text
+    warning: '#FF3B3B'    // Rug pull red
+};
+
 const CandleChart = () => {
     // ==================== State Management ====================
     
@@ -36,6 +44,7 @@ const CandleChart = () => {
     const [isGeneratingCandles, setIsGeneratingCandles] = useState<boolean>(false);  // Controls candle generation
     const [currentCandleIndex, setCurrentCandleIndex] = useState<number>(0);         // Current candle position
     const [candleData, setCandleData] = useState<any[]>([]);         // Current candle data
+    const [showMoonShot, setShowMoonShot] = useState(false);
     
     // Rug pull related states
     const [rugPulled, setRugPulled] = useState(false);               // Indicates if rug pull occurred
@@ -56,7 +65,7 @@ const CandleChart = () => {
     const yAxisMax = useRef<number>(1.5);                                 // Y-axis maximum value
     
     // Timing and control refs
-    const MAX_DURATION_MS = 30 * 1000;                                    // Maximum chart duration (30 seconds)
+    const MAX_DURATION_MS = 60 * 1000;                                    // Maximum chart duration (30 seconds)
     const rugPullTimeoutRef = useRef<number | null>(null);               // Stores rug pull timeout
     const startTimeRef = useRef<number>(0);                              // Chart start time
     const countdownRef = useRef<number>(3);                              // Countdown value reference
@@ -102,17 +111,35 @@ const CandleChart = () => {
                 }),
                 backgroundColor: visibleCandles.map((candle) => {
                     if (!candle) return 'transparent';
-                    return candle.value >= candle.base ? 'rgba(0, 255, 0, 1)' : 'rgba(255, 0, 0, 1)';
+                    return candle.value >= candle.base ? 
+                        `rgba(20, 241, 149, ${rugPulled ? 0.5 : 0.8})` : 
+                        `rgba(255, 59, 59, ${rugPulled ? 0.5 : 0.8})`;
                 }),
+                
+                // Border styling
                 borderColor: visibleCandles.map((candle) => {
                     if (!candle) return 'transparent';
-                    return candle.value >= candle.base ? 'rgba(0, 255, 0, 1)' : 'rgba(255, 0, 0, 1)';
+                    return candle.value >= candle.base ? 
+                        'rgba(20, 241, 149, 1)' : 
+                        'rgba(255, 59, 59, 1)';
                 }),
-                borderWidth: 1,
+                borderWidth: 2,
+                borderRadius: 2,
+                
+                // Hover effects
+                hoverBackgroundColor: visibleCandles.map((candle) => {
+                    if (!candle) return 'transparent';
+                    return candle.value >= candle.base ? 
+                        'rgba(20, 241, 149, 1)' : 
+                        'rgba(255, 59, 59, 1)';
+                }),
+                hoverBorderColor: SOLANA_COLORS.secondary,
+                hoverBorderWidth: 3,
                 base: visibleCandles.map((candle) => candle?.base || null),
                 barPercentage: 0.8,
                 categoryPercentage: 0.8,
                 barThickness: 20,
+                transition: 'all 0.3s ease',
             }]
         };
     };
@@ -278,6 +305,12 @@ const CandleChart = () => {
             const currentIndex = currentIndexRef.current;
             const finalValue = animationState.current.targetValue;
             
+            const priceChange = (finalValue - animationState.current.base) / animationState.current.base;
+            if (priceChange > 0.05) { // 10% increase
+                setShowMoonShot(true);
+                setTimeout(() => setShowMoonShot(false), 3000);
+            }
+
             updateAxisBounds(finalValue);
             
             // Store completed candle
@@ -350,6 +383,8 @@ const CandleChart = () => {
         
         return 'linear-gradient(to bottom, #13141b, #13141b)';
     };
+
+
 
     // ==================== Effect Hooks ====================
     
@@ -447,6 +482,7 @@ const CandleChart = () => {
         }
     }, [isShowingRugPullMessage]);
 
+
     // ==================== Chart Configuration ====================
     
     // Chart.js options configuration
@@ -454,27 +490,43 @@ const CandleChart = () => {
         responsive: true,
         maintainAspectRatio: false,
         animation: {
-            duration: 0
+            duration: 0,
         },
         scales: {
             y: {
                 position: 'left',
                 ticks: {
                     callback: (value: number) => `${value.toFixed(1)}x`,
-                    color: '#e6e6e6',
+                    color: SOLANA_COLORS.text,
                     font: {
                         size: 11,
                         family: "'Orbitron', sans-serif",
                         weight: 'bold'
                     },
+                    // Add padding for better readability
+                    padding: 8,
+                    // Add glow effect to ticks
+                    textStrokeWidth: 1,
+                    textStrokeColor: 'rgba(20, 241, 149, 0.2)',
                 },
                 min: yAxisMin.current,
                 max: yAxisMax.current,
                 grid: {
-                    color: 'rgba(230, 230, 230, 0.1)',
-                    lineWidth: 1,
-                    borderDash: [5, 5]
-                }
+                    color: (context: { tick: {value: number} }) => {
+                        const value = context.tick.value;
+                        // Make grid lines more prominent near current value
+                        const distance = Math.abs(value - animationState.current.currentValue);
+                        const alpha = Math.max(0.1, 0.3 - distance * 0.1);
+                        return `rgba(20, 241, 149, ${alpha})`;
+                    },
+                    lineWidth: (context: { tick: { value: number } }) => {
+                        return context.tick.value === 1 ? 2 : 1; // Make the 1x line thicker
+                    },
+                    borderDash: [5, 5],
+                    drawBorder: false,
+                },
+                // Add transition for smooth updates
+                transition: 'all 0.3s ease',
             },
             x: {
                 display: false,
@@ -500,15 +552,18 @@ const CandleChart = () => {
                         type: 'line',
                         yMin: animationState.current.currentValue,
                         yMax: animationState.current.currentValue,
-                        borderColor: '#e6e6e6',
-                        borderWidth: 1,
+                        borderColor: rugPulled ? SOLANA_COLORS.warning : SOLANA_COLORS.primary,
+                        borderWidth: 2,
                         borderDash: [5, 5],
+                        // Add glow effect
+                        shadowBlur: 10,
+                        shadowColor: rugPulled ? 'rgba(255, 59, 59, 0.5)' : 'rgba(20, 241, 149, 0.5)',
                         label: {
                             display: true,
                             content: `${animationState.current.currentValue.toFixed(4)}x`,
                             position: 'end',
-                            backgroundColor: 'rgba(0, 0, 0, 0.85)',
-                            color: '#ffffff',
+                            backgroundColor: rugPulled ? 'rgba(255, 59, 59, 0.9)' : 'rgba(20, 241, 149, 0.9)',
+                            color: SOLANA_COLORS.dark,
                             font: {
                                 family: "'Orbitron', sans-serif",
                                 size: 14,
@@ -521,8 +576,26 @@ const CandleChart = () => {
                                 right: 10
                             },
                             borderRadius: 4,
-                            textAlign: 'center'
+                            textAlign: 'center',
+                            // Add glow effect to label
+                            shadowBlur: 10,
+                            shadowColor: rugPulled ? 'rgba(255, 59, 59, 0.5)' : 'rgba(20, 241, 149, 0.5)',
+                            borderWidth: 1,
+                            borderColor: rugPulled ? SOLANA_COLORS.warning : SOLANA_COLORS.primary,
+                            textShadow: `0 0 10px ${rugPulled ? 'rgba(255, 59, 59, 0.7)' : 'rgba(20, 241, 149, 0.7)'}`,
+                            animation: 'pulse 2s infinite',
                         }
+                    },
+                    // Add background gradient zone
+                    gradient1: {
+                        type: 'box',
+                        xMin: 0,
+                        xMax: 100,
+                        yMin: yAxisMin.current,
+                        yMax: yAxisMax.current,
+                        backgroundColor: 'rgba(20, 241, 149, 0.02)',
+                        borderWidth: 0,
+                        drawTime: 'beforeDatasetsDraw',
                     }
                 }
             }
@@ -531,19 +604,75 @@ const CandleChart = () => {
 
     // ==================== Render ====================
     return (
+        
         <div style={{ 
             position: 'relative', 
             height: '400px', 
             width: '100%',
-            backgroundColor: '#13141b',
+            backgroundColor: SOLANA_COLORS.dark,
             borderRadius: '8px',
             padding: '20px',
-            animation: shakingChart ? 'shake 0.5s infinite' : 'none',
+            animation: `${shakingChart ? 'rugPullShake 0.5s infinite' : 'glow 2s infinite'}`,
             background: getBackgroundGradient(),
-            transition: 'background 0.5s ease',
+            transition: 'all 0.5s ease',
+            border: `1px solid ${rugPulled ? SOLANA_COLORS.warning : SOLANA_COLORS.primary}`,
+            boxShadow: `0 0 20px ${rugPulled ? 'rgba(255, 59, 59, 0.2)' : 'rgba(20, 241, 149, 0.2)'}`,
         }}>
+            {/* Moon shot effect and message */}
+            {showMoonShot && (
+                <>
+                    {/* Rocket and stars */}
+                    <div style={{ position: 'absolute', width: '100%', height: '100%', overflow: 'hidden', pointerEvents: 'none' }}>
+                        <div 
+                            className="moon-rocket"
+                            style={{
+                                bottom: '20%',
+                                left: '50%',
+                            }}
+                        >
+                            🚀
+                        </div>
+                        
+                        {Array.from({ length: 20 }, (_, i) => (
+                            <div
+                                key={i}
+                                className="star"
+                                style={{
+                                    left: `${Math.random() * 100}%`,
+                                    top: `${Math.random() * 100}%`,
+                                    animationDelay: `${Math.random() * 1}s`,
+                                }}
+                            >
+                                ✨
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Celebratory message */}
+                    <div style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        color: SOLANA_COLORS.primary,
+                        fontSize: '32px',
+                        fontWeight: 'bold',
+                        fontFamily: "'Orbitron', sans-serif",
+                        textShadow: '0 0 10px rgba(20, 241, 149, 0.7)',
+                        zIndex: 11,
+                        textAlign: 'center',
+                        animation: 'moonShot 3s forwards',
+                        pointerEvents: 'none',
+                    }}>
+                        TO THE MOON! 🌕
+                    </div>
+                </>
+            )}
             {/* Render Chart */}
-            {data && <Bar data={data} options={options as any} />}
+            {data && <Bar data={data} options={options as any} style={{
+                            filter: rugPulled ? 'contrast(1.2) brightness(0.8)' : 'none',
+                transition: 'all 0.3s ease',
+            }} />}
             
             {/* Render Countdown */}
             {countdownRef.current > 0 && (
