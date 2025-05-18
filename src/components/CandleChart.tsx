@@ -617,12 +617,11 @@ const CandleChart = () => {
 
     // ==================== Render ====================
     return (
-        
         <div style={{ 
             position: 'relative', 
             height: '400px', 
-            width: '100%',
-            minWidth: '320px',
+            width: 'calc(100% - 40px)',
+            minWidth: '280px',
             backgroundColor: SOLANA_COLORS.dark,
             borderRadius: '8px',
             padding: '20px',
@@ -631,6 +630,7 @@ const CandleChart = () => {
             transition: 'all 0.5s ease',
             border: `1px solid ${rugPulled ? SOLANA_COLORS.warning : SOLANA_COLORS.primary}`,
             boxShadow: `0 0 20px ${rugPulled ? 'rgba(255, 59, 59, 0.2)' : 'rgba(20, 241, 149, 0.2)'}`,
+            margin: '0 20px', 
         }}>
             {/* Moon shot effect and message */}
             {showMoonShot && (

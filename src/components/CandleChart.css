@@ -96,6 +96,7 @@
     transition: all 0.3s ease;
 }
 
+
 /* Tooltip customization */
 .chart-tooltip {
     background-color: rgba(19, 20, 27, 0.9) !important;
