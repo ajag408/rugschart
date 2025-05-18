@@ -6,7 +6,27 @@
 
 ## 📝 Project Overview
 
-This project demonstrates advanced frontend development skills through the implementation of an interactive crypto-themed chart visualization. The main focus was on enhancing the chart component with engaging animations, smooth transitions, and responsive design.
+The main focus was on enhancing the chart component with engaging animations, smooth transitions, and responsive design.
+
+## 💡 Technical Migration
+
+### Canvas to Chart.js Trade-off
+
+**Original Canvas Implementation**
+
+- Low-level drawing API with direct pixel manipulation
+- Complete control over rendering and animations
+- Manual handling of all chart behaviors
+- Complex but highly customizable
+
+**Current Chart.js Solution**
+
+- High-level, declarative API
+- Built-in handling of animations, scaling, and responsiveness
+- Plugin system for extended functionality
+- Faster development and better maintainability
+
+This migration prioritized development efficiency and maintainability while retaining the ability to create custom animations and effects.
 
 ## 🎯 Key Features
 
