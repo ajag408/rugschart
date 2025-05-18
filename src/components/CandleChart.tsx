@@ -42,8 +42,6 @@ const CandleChart = () => {
     const [countdown, setCountdown] = useState<number>(3);            // Countdown timer before chart starts
     const [isRunning, setIsRunning] = useState<boolean>(true);       // Controls countdown state
     const [isGeneratingCandles, setIsGeneratingCandles] = useState<boolean>(false);  // Controls candle generation
-    const [currentCandleIndex, setCurrentCandleIndex] = useState<number>(0);         // Current candle position
-    const [candleData, setCandleData] = useState<any[]>([]);         // Current candle data
     const [showMoonShot, setShowMoonShot] = useState(false);
     
     // Rug pull related states
@@ -183,7 +181,6 @@ const CandleChart = () => {
         };
         
         // Update chart display
-        setCandleData([]);
         setData(createChartData([]));
     };
 
@@ -231,9 +228,7 @@ const CandleChart = () => {
         setIsShowingRugPullMessage(false);
         setIsGeneratingCandles(false);
         setRugPulled(false);
-        setCandleData([]);
         setData(createChartData([]));
-        setCurrentCandleIndex(0);
         setCountdown(3);
         
         // Start new round
@@ -305,7 +300,7 @@ const CandleChart = () => {
             const finalValue = animationState.current.targetValue;
             
             const priceChange = (finalValue - animationState.current.base) / animationState.current.base;
-            if (priceChange > 0.05) { // 10% increase
+            if (priceChange > 0.05) { // 5% increase
                 setShowMoonShot(true);
                 setTimeout(() => setShowMoonShot(false), 3000);
             }
@@ -320,14 +315,12 @@ const CandleChart = () => {
             };
 
             // Update chart
-            setCandleData([]);
             setData(createChartData([]));
 
             // Start next candle or reset chart
             if (currentIndex < 29) {
                 const nextIndex = currentIndex + 1;
                 currentIndexRef.current = nextIndex;
-                setCurrentCandleIndex(nextIndex);
                 startNewCandle();
             } else {
                 console.log('Reached end of chart');
@@ -355,7 +348,6 @@ const CandleChart = () => {
             };
             
             // Update chart
-            setCandleData(newCandleData);
             setData(createChartData(newCandleData));
         }
 
