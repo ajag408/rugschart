@@ -138,8 +138,7 @@ const CandleChart = () => {
                 base: visibleCandles.map((candle) => candle?.base || null),
                 barPercentage: 0.8,
                 categoryPercentage: 0.8,
-                barThickness: 20,
-                transition: 'all 0.3s ease',
+                barThickness: 20
             }]
         };
     };
@@ -622,7 +621,7 @@ const CandleChart = () => {
             {showMoonShot && (
                 <>
                     {/* Rocket and stars */}
-                    <div style={{ position: 'absolute', width: '100%', height: '100%', overflow: 'hidden', pointerEvents: 'none' }}>
+                    <div style={{ position: 'absolute', width: '100%', height: '100%', overflow: 'hidden', pointerEvents: 'none', borderRadius: '8px' }}>
                         <div 
                             className="moon-rocket"
                             style={{
@@ -638,9 +637,10 @@ const CandleChart = () => {
                                 key={i}
                                 className="star"
                                 style={{
-                                    left: `${Math.random() * 100}%`,
-                                    top: `${Math.random() * 100}%`,
+                                    left: `${Math.random() * 95}%`,
+                                    top: `${Math.random() * 90}%`,
                                     animationDelay: `${Math.random() * 1}s`,
+                                    transform: 'translateX(-10%)'
                                 }}
                             >
                                 ✨

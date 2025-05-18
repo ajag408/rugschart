@@ -33,16 +33,6 @@ function App() {
         }}>
           Rug Chart
         </h1>
-        <p style={{
-          color: SOLANA_COLORS.text,
-          opacity: 0.8,
-          fontSize: '1.1rem',
-          marginTop: '1rem',
-          fontFamily: "'Orbitron', sans-serif",
-          letterSpacing: '0.05em'
-        }}>
-          Watch the charts, avoid the rugs
-        </p>
       </header>
       
       <main style={{
