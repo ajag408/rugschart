@@ -652,10 +652,10 @@ const CandleChart = () => {
                                 key={i}
                                 className="star"
                                 style={{
-                                    left: `${Math.random() * 95}%`,
+                                    left: `${Math.random() * 90}%`,
                                     top: `${Math.random() * 90}%`,
                                     animationDelay: `${Math.random() * 1}s`,
-                                    transform: 'translateX(-10%)'
+                                    transform: 'translateX(-5%)'
                                 }}
                             >
                                 ✨
@@ -683,36 +683,29 @@ const CandleChart = () => {
                     </div>
                 </>
             )}
+                {/* Chart wrapper */}
+    <div style={{ 
+        position: 'relative',  // Changed to relative
+        height: '100%',       // Added height
+        width: '100%',        // Added width
+    }}>
             {/* Render Chart */}
             {data && <Bar data={data} options={options as any} style={{
                             filter: rugPulled ? 'contrast(1.2) brightness(0.8)' : 'none',
                 transition: 'all 0.3s ease',
             }} />}
+    </div>
             
             {/* Render Countdown */}
             {countdownRef.current > 0 && (
-                <div style={{
-                    position: 'absolute',
-                    top: '35%',
-                    left: '40%',
-                    transform: 'translate(-50%, -50%)',
-                    marginTop: '-20px',
-                    marginLeft: '-20px',
-                    padding: '20px',
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                    color: 'white',
-                    borderRadius: '8px',
-                    textAlign: 'center',
+                <div className="countdown-container" style={{
                     animation: countdownRef.current <= 3 ? 'pulse 0.5s infinite' : 'none',
-                    zIndex: 10,
-                    fontFamily: "'Orbitron', sans-serif", 
-                    textShadow: '0 0 10px rgba(255, 255, 255, 0.5)'
                 }}>
                     <div style={{ 
                         fontSize: '20px', 
                         marginBottom: '10px',
                         whiteSpace: 'nowrap',  
-                        letterSpacing: '1px' 
+                        letterSpacing: '1px',
                     }}>
                         Next Round In:
                     </div>
@@ -720,7 +713,7 @@ const CandleChart = () => {
                         fontSize: '48px', 
                         fontWeight: 'bold',
                         lineHeight: 1,  
-                        letterSpacing: '2px'  
+                        letterSpacing: '2px',
                     }}>
                         {countdownRef.current.toFixed(1)}s
                     </div>
