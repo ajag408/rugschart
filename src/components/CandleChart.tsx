@@ -136,7 +136,9 @@ const CandleChart = () => {
                 base: visibleCandles.map((candle) => candle?.base || null),
                 barPercentage: 0.8,
                 categoryPercentage: 0.8,
-                barThickness: 20
+                barThickness: 'flex',  // This helps maintain consistent width
+                maxBarThickness: 20,   // Maximum width of bars
+                minBarLength: 2,       // Minimum height of bars
             }]
         };
     };
@@ -520,14 +522,34 @@ const CandleChart = () => {
                 transition: 'all 0.3s ease',
             },
             x: {
-                display: false,
+                // Add these configurations
+                min: 0,
+                max: 29,
+                ticks: {
+                    display: false
+                },
                 grid: {
                     display: false
                 },
+                // This is important for mobile
                 offset: true,
-                ticks: {
-                    display: false
+                // These ensure consistent bar width
+                afterFit: (scale: { paddingRight: number; paddingLeft: number }) => {
+                    scale.paddingRight = 20;
+                    scale.paddingLeft = 20;
                 }
+            },
+        },
+        elements: {
+            bar: {
+                borderWidth: 2,
+                borderRadius: 2
+            }
+        },
+        layout: {
+            padding: {
+                left: 10,
+                right: 10
             }
         },
         plugins: {
@@ -600,6 +622,7 @@ const CandleChart = () => {
             position: 'relative', 
             height: '400px', 
             width: '100%',
+            minWidth: '320px',
             backgroundColor: SOLANA_COLORS.dark,
             borderRadius: '8px',
             padding: '20px',
