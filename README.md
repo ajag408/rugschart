@@ -1,4 +1,4 @@
-# Rug Chart - Frontend Developer Technical Assessment
+# Rug Chart - Frontend Developer Assessment
 
 ## 🔗 Live Demo
 
